@@ -1,0 +1,127 @@
+-- 🌸 Auto Spam M2 Lock + GUI (phiên bản thủ công, không schedule)
+local Players = game:GetService("Players")
+local p = Players.LocalPlayer
+
+-- ⚙️ Cấu hình
+local FIRE_INTERVAL = 0.65
+local payload_str = "\019\000\000\0000201100101186595482\000"
+
+-- 🔹 Tìm remote
+local remote
+pcall(function()
+	local rs = game:GetService("ReplicatedStorage")
+	local bridge = rs:FindFirstChild("BridgeNet2")
+	if bridge then
+		remote = bridge:FindFirstChild("dataRemoteEvent")
+	end
+	if not remote then
+		for _, v in ipairs(rs:GetDescendants()) do
+			if v.Name == "dataRemoteEvent" then
+				remote = v
+				break
+			end
+		end
+	end
+end)
+
+-- 🔹 buffer handler
+local bf
+if type(buffer) == "table" and type(buffer.fromstring) == "function" then
+	bf = buffer.fromstring
+else
+	bf = function(s)
+		return s
+	end
+end
+
+-- 🔹 Biến trạng thái
+local STATE = { active = false, gui = nil }
+
+-- 🔹 Hàm gửi M2
+local function safeFire()
+	if remote and bf then
+		pcall(function()
+			remote:FireServer({ { bf(payload_str) }, "\019" })
+		end)
+	else
+		if not safeFire._warned then
+			safeFire._warned = true
+			warn("[Auto M2] remote hoặc bf không khả dụng; không gửi được.")
+		end
+	end
+end
+
+-- 🔹 Tạo GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SpamM2_GUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game.CoreGui
+STATE.gui = ScreenGui
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 160, 0, 60)
+Frame.Position = UDim2.new(0.5, -80, 0.7, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Frame.BackgroundTransparency = 0.1
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner", Frame)
+UICorner.CornerRadius = UDim.new(0, 10)
+
+-- 🔘 Nút bật/tắt
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.7, -5, 1, 0)
+ToggleBtn.Position = UDim2.new(0, 5, 0, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Text = "BẬT M2"
+ToggleBtn.Parent = Frame
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 8)
+
+-- ❌ Nút xóa GUI
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0.3, -10, 1, 0)
+CloseBtn.Position = UDim2.new(0.7, 5, 0, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 18
+CloseBtn.Text = "X"
+CloseBtn.Parent = Frame
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
+
+-- 🔹 Luồng spam chính
+task.spawn(function()
+	while task.wait(FIRE_INTERVAL) do
+		if STATE.active then
+			safeFire()
+		end
+	end
+end)
+
+-- 🔹 Nút bật/tắt spam
+ToggleBtn.MouseButton1Click:Connect(function()
+	STATE.active = not STATE.active
+	if STATE.active then
+		ToggleBtn.Text = "TẮT M2"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+	else
+		ToggleBtn.Text = "BẬT M2"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
+	end
+end)
+
+-- 🔹 Nút xóa GUI + dừng spam
+CloseBtn.MouseButton1Click:Connect(function()
+	STATE.active = false
+	if STATE.gui then
+		STATE.gui:Destroy()
+		STATE.gui = nil
+	end
+	print("[Auto M2] Đã xóa GUI và dừng script.")
+end)
+
+print("[Auto M2] GUI đã tạo. Nhấn 'BẬT M2' để kích hoạt spam.")
