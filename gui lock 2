@@ -1,0 +1,95 @@
+-- 🌸 TP1 Lock với GUI (bật/tắt + nút xóa)
+local Players = game:GetService("Players")
+local p = Players.LocalPlayer
+local pos = Vector3.new(42.29, 3.63, -132.49)
+
+local STATE = { tp1 = false, gui = nil }
+
+-- 🔹 Tạo GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TP1_Lock_GUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game.CoreGui
+STATE.gui = ScreenGui
+
+-- 🔹 Tạo Frame chính
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 160, 0, 60)
+Frame.Position = UDim2.new(0.5, -80, 0.8, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BackgroundTransparency = 0.2
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+-- 🔹 UICorner bo góc
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = Frame
+
+-- 🔹 Nút Bật/Tắt Lock
+local LockBtn = Instance.new("TextButton")
+LockBtn.Size = UDim2.new(0.7, -5, 1, 0)
+LockBtn.Position = UDim2.new(0, 5, 0, 0)
+LockBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 255)
+LockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+LockBtn.Font = Enum.Font.GothamBold
+LockBtn.TextSize = 16
+LockBtn.Text = "BẬT LOCK"
+LockBtn.Parent = Frame
+
+local LockCorner = Instance.new("UICorner", LockBtn)
+LockCorner.CornerRadius = UDim.new(0, 8)
+
+-- 🔹 Nút X để xóa GUI
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0.3, -10, 1, 0)
+CloseBtn.Position = UDim2.new(0.7, 5, 0, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 18
+CloseBtn.Text = "X"
+CloseBtn.Parent = Frame
+
+local CloseCorner = Instance.new("UICorner", CloseBtn)
+CloseCorner.CornerRadius = UDim.new(0, 8)
+
+-- 🔹 Chức năng Lock
+task.spawn(function()
+	while task.wait(0.05) do
+		if STATE.tp1 then
+			local c = p.Character
+			if c then
+				local hrp = c:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					hrp.Velocity = Vector3.zero
+					hrp.CFrame = CFrame.new(pos)
+				end
+			end
+		end
+	end
+end)
+
+-- 🔹 Sự kiện nhấn nút Lock
+LockBtn.MouseButton1Click:Connect(function()
+	STATE.tp1 = not STATE.tp1
+	if STATE.tp1 then
+		LockBtn.Text = "TẮT LOCK"
+		LockBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+	else
+		LockBtn.Text = "BẬT LOCK"
+		LockBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 255)
+	end
+end)
+
+-- 🔹 Sự kiện nhấn nút (X)
+CloseBtn.MouseButton1Click:Connect(function()
+	STATE.tp1 = false
+	if STATE.gui then
+		STATE.gui:Destroy()
+		STATE.gui = nil
+	end
+	print("[TP1 Lock] Đã xóa GUI và dừng script.")
+end)
+
+print("[TP1 Lock] Đã tạo GUI. Nhấn 'BẬT LOCK' để cố định vị trí.")
