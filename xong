@@ -1,0 +1,24 @@
+-- 🌸 Multi-GUI Loader — by anhhien98nd
+-- Tự động load và chạy 4 script cùng lúc
+
+local urls = {
+    "https://raw.githubusercontent.com/anhhien98nd/gui/refs/heads/main/gui%20lock%202",
+    "https://raw.githubusercontent.com/anhhien98nd/gui/refs/heads/main/gui%20fast%20m1",
+    "https://raw.githubusercontent.com/anhhien98nd/gui/refs/heads/main/gui%20fast%20m2",
+    "https://raw.githubusercontent.com/anhhien98nd/gui/refs/heads/main/gui%20lock%201"
+}
+
+print("[MultiGUI] 🚀 Bắt đầu tải và chạy 4 script GUI cùng lúc...")
+
+for _, url in ipairs(urls) do
+    task.spawn(function()
+        pcall(function()
+            print("[MultiGUI] ⏳ Đang tải:", url)
+            local scriptCode = game:HttpGet(url)
+            loadstring(scriptCode)()
+            print("[MultiGUI] ✅ Hoàn tất:", url)
+        end)
+    end)
+end
+
+print("[MultiGUI] 🌸 Tất cả script đã được load song song!")
