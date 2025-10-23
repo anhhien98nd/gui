@@ -1,5 +1,12 @@
--- 🌸 Multi-GUI Loader — by anhhien98nd
--- Tự động load và chạy 4 script cùng lúc
+-- Multi-GUI Loader (each GUI draggable independently)
+-- Loads each URL, detects the new ScreenGui created, finds top-level Frames and makes them draggable.
+-- This ensures dragging one GUI does not affect other GUIs.
+
+local HttpGet = function(url)
+    local ok, res = pcall(function() return game:HttpGet(url) end)
+    if ok then return res end
+    return nil, res
+end
 
 local urls = {
     "https://raw.githubusercontent.com/anhhien98nd/gui/refs/heads/main/gui%20lock%202",
@@ -8,17 +15,146 @@ local urls = {
     "https://raw.githubusercontent.com/anhhien98nd/gui/refs/heads/main/gui%20lock%201"
 }
 
-print("[MultiGUI] 🚀 Bắt đầu tải và chạy 4 script GUI cùng lúc...")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+local PlayerGui = player and player:FindFirstChild("PlayerGui")
 
-for _, url in ipairs(urls) do
-    task.spawn(function()
-        pcall(function()
-            print("[MultiGUI] ⏳ Đang tải:", url)
-            local scriptCode = game:HttpGet(url)
-            loadstring(scriptCode)()
-            print("[MultiGUI] ✅ Hoàn tất:", url)
-        end)
-    end)
+-- Helper: snapshot children -> map of Instance -> true
+local function snapshotChildren(parent)
+    local map = {}
+    for _, v in ipairs(parent:GetChildren()) do map[v] = true end
+    return map
 end
 
-print("[MultiGUI] 🌸 Tất cả script đã được load song song!")
+-- Helper: find newly added ScreenGuis comparing before/after maps (checks both CoreGui and PlayerGui)
+local function findNewScreenGuis(beforeCore, beforePlayer)
+    local added = {}
+
+    for _, g in ipairs(CoreGui:GetChildren()) do
+        if g:IsA("ScreenGui") and not beforeCore[g] then table.insert(added, g) end
+    end
+    if PlayerGui then
+        for _, g in ipairs(PlayerGui:GetChildren()) do
+            if g:IsA("ScreenGui") and not beforePlayer[g] then table.insert(added, g) end
+        end
+    end
+    return added
+end
+
+-- Choose candidate frames to make draggable for a ScreenGui:
+-- 1) direct children that are Frames
+-- 2) if none, the largest Frame descendant by area (fallback)
+local function getRootFrames(screenGui)
+    local roots = {}
+    for _, c in ipairs(screenGui:GetChildren()) do
+        if c:IsA("Frame") then table.insert(roots, c) end
+    end
+    if #roots > 0 then return roots end
+
+    -- fallback: find the largest Frame descendant
+    local best, bestArea = nil, 0
+    for _, d in ipairs(screenGui:GetDescendants()) do
+        if d:IsA("Frame") and d.AbsoluteSize and d.AbsoluteSize.X and d.AbsoluteSize.Y then
+            local area = d.AbsoluteSize.X * d.AbsoluteSize.Y
+            if area > bestArea then bestArea, best = area, d end
+        end
+    end
+    if best then return {best} end
+    return {}
+end
+
+-- Make a single Frame draggable (isolated handlers)
+local function makeFrameDraggable(frame)
+    if not frame or not frame:IsA("GuiObject") then return end
+    frame.Active = true -- allow input capture
+
+    local UserInputService = game:GetService("UserInputService")
+    local dragging = false
+    local dragStartPos = Vector2.new(0,0)
+    local startPos = UDim2.new(0,0,0,0)
+    local connBegan, connChanged
+
+    connBegan = frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStartPos = input.Position
+            startPos = frame.Position
+            -- attach end listener on the input object
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    connChanged = frame.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStartPos
+            -- compute new position
+            frame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    -- return a cleanup function in case we want to disconnect later
+    return function()
+        if connBegan and connBegan.Disconnect then connBegan:Disconnect() end
+        if connChanged and connChanged.Disconnect then connChanged:Disconnect() end
+    end
+end
+
+-- After loading a script, detect new ScreenGuis and enable dragging on their root frames
+local function processNewGuis(beforeCore, beforePlayer)
+    local newGuis = findNewScreenGuis(beforeCore, beforePlayer)
+    for _, gui in ipairs(newGuis) do
+        -- give some time for children to initialize
+        task.spawn(function()
+            task.wait(0.1)
+            local roots = getRootFrames(gui)
+            if #roots == 0 then
+                print("[MultiGUI] (warn) Không tìm thấy Frame gốc trong GUI:", gui.Name)
+            else
+                for _, f in ipairs(roots) do
+                    makeFrameDraggable(f)
+                end
+                print(string.format("[MultiGUI] ✨ GUI '%s' đã được bật kéo độc lập (%d root frames).", gui.Name or "<noname>", #roots))
+            end
+        end)
+    end
+end
+
+-- Load each URL and enable draggable on GUI(s) it creates
+for _, url in ipairs(urls) do
+    task.spawn(function()
+        local beforeCore = snapshotChildren(CoreGui)
+        local beforePlayer = PlayerGui and snapshotChildren(PlayerGui) or {}
+        local ok, source = pcall(HttpGet, url)
+        if not ok or not source then
+            warn("[MultiGUI] Không tải được:", url, source)
+            return
+        end
+
+        local srOk, srErr = pcall(function()
+            local f = loadstring and loadstring(source) or load(source)
+            if not f then error("compile failed") end
+            f()
+        end)
+        if not srOk then
+            warn("[MultiGUI] Lỗi khi chạy script từ:", url, srErr)
+            return
+        end
+
+        -- small delay then detect and process new GUI(s)
+        task.wait(0.25)
+        processNewGuis(beforeCore, beforePlayer)
+    end)
+    task.wait(0.25) -- small gap between downloads
+end
+
+print("[MultiGUI] Hoàn tất khởi chạy; mỗi GUI mới sẽ có thể di chuyển độc lập.")
