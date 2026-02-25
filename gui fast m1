@@ -1,90 +1,148 @@
--- 🌸 Auto Fast M1 Lock (Manual toggle + GUI)
+-- 🌸 Auto Spam M2 Lock + GUI (phiên bản thủ công, có thể kéo GUI)
 local Players = game:GetService("Players")
 local p = Players.LocalPlayer
+local rs = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 -- ⚙️ Cấu hình
 local FIRE_INTERVAL = 0.1
-local payload_str = "\019\000\000\0000201000113686372022\000"
 
 -- 🔹 Tìm remote
 local remote
 pcall(function()
-	local rs = game:GetService("ReplicatedStorage")
-	local bridge = rs:FindFirstChild("BridgeNet2")
-	if bridge then
-		remote = bridge:FindFirstChild("dataRemoteEvent")
-	end
-	if not remote then
-		for _, v in ipairs(rs:GetDescendants()) do
-			if v.Name == "dataRemoteEvent" then
-				remote = v
-				break
-			end
-		end
-	end
+    local bridge = rs:FindFirstChild("BridgeNet2")
+    if bridge then
+        remote = bridge:FindFirstChild("dataRemoteEvent")
+    end
+    if not remote then
+        for _, v in ipairs(rs:GetDescendants()) do
+            if v.Name == "dataRemoteEvent" then
+                remote = v
+                break
+            end
+        end
+    end
 end)
 
 -- 🔹 buffer handler
-local bf
-if type(buffer) == "table" and type(buffer.fromstring) == "function" then
-	bf = buffer.fromstring
-else
-	bf = function(s)
-		return s
-	end
-end
+local bf = buffer and buffer.fromstring or function(s) return s end
 
--- 🔹 Biến điều khiển
+-- 🔹 Biến trạng thái
 local STATE = { active = false, gui = nil }
 
--- 🔹 Hàm gửi spam
+-- 🔹 Hàm gửi M2
 local function safeFire()
-	if remote and bf then
-		pcall(function()
-			remote:FireServer({ { bf(payload_str) }, "\019" })
-		end)
-	else
-		if not safeFire._warned then
-			safeFire._warned = true
-			warn("[Fast M1] remote hoặc bf không khả dụng; không gửi được.")
-		end
-	end
+    if not remote then
+        if not safeFire._warned then
+            safeFire._warned = true
+            warn("[Auto M2] Không tìm thấy dataRemoteEvent")
+        end
+        return
+    end
+
+    pcall(function()
+        local live = workspace:WaitForChild("Live", 5)
+        if not live then return end
+        
+        local target = live:WaitForChild("BlockingGuy", 0.5)
+        if not target then return end
+
+        local payload = bf("\019\000\000\0000101100111722632915\000")
+
+        local args = {
+            {
+                { payload, target },
+                "\023"
+            }
+        }
+
+        remote:FireServer(unpack(args))
+    end)
 end
 
--- 🔹 GUI setup
+-- ────────────────────────────────────────────────
+--                  TẠO GUI
+-- ────────────────────────────────────────────────
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FastM1_GUI"
+ScreenGui.Name = "SpamM2_GUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game.CoreGui
+ScreenGui.Parent = game:GetService("CoreGui")
 STATE.gui = ScreenGui
 
 local Frame = Instance.new("Frame")
 Frame.Size = UDim2.new(0, 160, 0, 60)
-Frame.Position = UDim2.new(0.5, -80, 0.8, 0)
+Frame.Position = UDim2.new(0.5, -80, 0.7, -30)
 Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 Frame.BackgroundTransparency = 0.1
 Frame.BorderSizePixel = 0
+Frame.Active = true  -- quan trọng để nhận input
+Frame.Draggable = false  -- ta sẽ tự code drag
 Frame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner", Frame)
 UICorner.CornerRadius = UDim.new(0, 10)
 
--- 🔘 Nút bật/tắt
+-- ─── DRAGGABLE LOGIC ───────────────────────────────────────
+local dragging = false
+local dragInput = nil
+local dragStart = nil
+local startPos = nil
+
+local function updateInput(input)
+    local delta = input.Position - dragStart
+    local newPosX = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    Frame.Position = newPosX
+end
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        updateInput(input)
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        updateInput(dragInput)
+    end
+end)
+
+-- ─── Nút bật/tắt ────────────────────────────────────────────
 local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0.7, -5, 1, 0)
-ToggleBtn.Position = UDim2.new(0, 5, 0, 0)
+ToggleBtn.Size = UDim2.new(0.7, -5, 1, -4)
+ToggleBtn.Position = UDim2.new(0, 5, 0, 2)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.Font = Enum.Font.GothamBold
 ToggleBtn.TextSize = 16
-ToggleBtn.Text = "BẬT M1"
+ToggleBtn.Text = "BẬT M2"
 ToggleBtn.Parent = Frame
 Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 8)
 
--- ❌ Nút xóa
+-- ─── Nút đóng ───────────────────────────────────────────────
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0.3, -10, 1, 0)
-CloseBtn.Position = UDim2.new(0.7, 5, 0, 0)
+CloseBtn.Size = UDim2.new(0.3, -10, 1, -4)
+CloseBtn.Position = UDim2.new(0.7, 5, 0, 2)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.Font = Enum.Font.GothamBold
@@ -93,35 +151,35 @@ CloseBtn.Text = "X"
 CloseBtn.Parent = Frame
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
 
--- 🔹 Luồng spam chính
+-- ─── Luồng spam ─────────────────────────────────────────────
 task.spawn(function()
-	while task.wait(FIRE_INTERVAL) do
-		if STATE.active then
-			safeFire()
-		end
-	end
+    while true do
+        task.wait(FIRE_INTERVAL)
+        if STATE.active then
+            safeFire()
+        end
+    end
 end)
 
--- 🔹 Nút bật/tắt
+-- ─── Sự kiện nút ────────────────────────────────────────────
 ToggleBtn.MouseButton1Click:Connect(function()
-	STATE.active = not STATE.active
-	if STATE.active then
-		ToggleBtn.Text = "TẮT M1"
-		ToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
-	else
-		ToggleBtn.Text = "BẬT M1"
-		ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
-	end
+    STATE.active = not STATE.active
+    if STATE.active then
+        ToggleBtn.Text = "TẮT M2"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+    else
+        ToggleBtn.Text = "BẬT M2"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 130, 255)
+    end
 end)
 
--- 🔹 Nút xóa GUI
 CloseBtn.MouseButton1Click:Connect(function()
-	STATE.active = false
-	if STATE.gui then
-		STATE.gui:Destroy()
-		STATE.gui = nil
-	end
-	print("[Fast M1] Đã xóa GUI và dừng script.")
+    STATE.active = false
+    if STATE.gui then
+        STATE.gui:Destroy()
+        STATE.gui = nil
+    end
+    print("[Auto M2] Đã xóa GUI và dừng script.")
 end)
 
-print("[Fast M1] GUI đã tạo. Nhấn 'BẬT M1' để kích hoạt spam.")
+print("[Auto M2] GUI đã tạo + có thể kéo thả. Nhấn 'BẬT M2' để kích hoạt spam.")
