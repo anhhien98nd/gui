@@ -10,6 +10,8 @@ end
 
 local urls = {
     "https://raw.githubusercontent.com/anhhien98nd/gui/refs/heads/main/gui%20lock%202",
+    "https://raw.githubusercontent.com/anhhien98nd/gui/refs/heads/main/gui%20fast%20m2",
+    "https://raw.githubusercontent.com/anhhien98nd/gui/refs/heads/main/gui%20fast%20m1",
     "https://raw.githubusercontent.com/anhhien98nd/gui/refs/heads/main/gui%20lock%201"
 }
 
