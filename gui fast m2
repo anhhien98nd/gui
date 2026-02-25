@@ -1,10 +1,12 @@
--- 🌸 Auto Spam M2 Lock + GUI (phiên bản thủ công, không schedule)
+-- 🌸 Auto Spam M2 Lock + GUI (phiên bản thủ công, có thể kéo GUI)
 local Players = game:GetService("Players")
 local p = Players.LocalPlayer
 local rs = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 -- ⚙️ Cấu hình
-local FIRE_INTERVAL = 0.8
+local FIRE_INTERVAL = 0.65
 
 -- 🔹 Tìm remote
 local remote
@@ -23,13 +25,13 @@ pcall(function()
     end
 end)
 
--- 🔹 buffer handler (hỗ trợ cả buffer.new lẫn string thô)
+-- 🔹 buffer handler
 local bf = buffer and buffer.fromstring or function(s) return s end
 
 -- 🔹 Biến trạng thái
 local STATE = { active = false, gui = nil }
 
--- 🔹 Hàm gửi M2 mới (theo format bạn yêu cầu)
+-- 🔹 Hàm gửi M2
 local function safeFire()
     if not remote then
         if not safeFire._warned then
@@ -43,7 +45,7 @@ local function safeFire()
         local live = workspace:WaitForChild("Live", 5)
         if not live then return end
         
-        local target = live:WaitForChild("BlockingGuy", 0.5)   -- nếu ko có BlockingGuy thì sẽ lỗi → bạn có thể thay tên khác nếu cần
+        local target = live:WaitForChild("BlockingGuy", 0.5)
         if not target then return end
 
         local payload = bf("\019\000\000\0000101100111722632915\000")
@@ -65,7 +67,7 @@ end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "SpamM2_GUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game:GetService("CoreGui")  -- hoặc p:WaitForChild("PlayerGui") nếu muốn
+ScreenGui.Parent = game:GetService("CoreGui")
 STATE.gui = ScreenGui
 
 local Frame = Instance.new("Frame")
@@ -74,12 +76,58 @@ Frame.Position = UDim2.new(0.5, -80, 0.7, -30)
 Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 Frame.BackgroundTransparency = 0.1
 Frame.BorderSizePixel = 0
+Frame.Active = true  -- quan trọng để nhận input
+Frame.Draggable = false  -- ta sẽ tự code drag
 Frame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner", Frame)
 UICorner.CornerRadius = UDim.new(0, 10)
 
--- Nút bật/tắt
+-- ─── DRAGGABLE LOGIC ───────────────────────────────────────
+local dragging = false
+local dragInput = nil
+local dragStart = nil
+local startPos = nil
+
+local function updateInput(input)
+    local delta = input.Position - dragStart
+    local newPosX = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    Frame.Position = newPosX
+end
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        updateInput(input)
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        updateInput(dragInput)
+    end
+end)
+
+-- ─── Nút bật/tắt ────────────────────────────────────────────
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0.7, -5, 1, -4)
 ToggleBtn.Position = UDim2.new(0, 5, 0, 2)
@@ -91,7 +139,7 @@ ToggleBtn.Text = "BẬT M2"
 ToggleBtn.Parent = Frame
 Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 8)
 
--- Nút đóng
+-- ─── Nút đóng ───────────────────────────────────────────────
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0.3, -10, 1, -4)
 CloseBtn.Position = UDim2.new(0.7, 5, 0, 2)
@@ -103,9 +151,7 @@ CloseBtn.Text = "X"
 CloseBtn.Parent = Frame
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
 
--- ────────────────────────────────────────────────
---                  LUỒNG SPAM
--- ────────────────────────────────────────────────
+-- ─── Luồng spam ─────────────────────────────────────────────
 task.spawn(function()
     while true do
         task.wait(FIRE_INTERVAL)
@@ -115,9 +161,7 @@ task.spawn(function()
     end
 end)
 
--- ────────────────────────────────────────────────
---                  SỰ KIỆN NÚT
--- ────────────────────────────────────────────────
+-- ─── Sự kiện nút ────────────────────────────────────────────
 ToggleBtn.MouseButton1Click:Connect(function()
     STATE.active = not STATE.active
     if STATE.active then
@@ -138,4 +182,4 @@ CloseBtn.MouseButton1Click:Connect(function()
     print("[Auto M2] Đã xóa GUI và dừng script.")
 end)
 
-print("[Auto M2] GUI đã tạo. Nhấn 'BẬT M2' để kích hoạt spam.")
+print("[Auto M2] GUI đã tạo + có thể kéo thả. Nhấn 'BẬT M2' để kích hoạt spam.")
