@@ -6,7 +6,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 -- ⚙️ Cấu hình
-local FIRE_INTERVAL = 0.75
+local FIRE_INTERVAL = 0.9
 
 -- 🔹 Tìm remote
 local remote
