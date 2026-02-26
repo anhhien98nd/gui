@@ -45,7 +45,7 @@ local function safeFire()
         local live = workspace:WaitForChild("Live", 5)
         if not live then return end
         
-        local target = live:WaitForChild("BlockingGuy", 0.5)
+        local target = live:WaitForChild("aximkaoik", 0.5)
         if not target then return end
 
         local payload = bf("\019\000\000\0000101100111722632915\000")
